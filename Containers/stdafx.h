@@ -7,8 +7,6 @@
 
 #include "targetver.h"
 
-
-
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
@@ -74,3 +72,4 @@ struct Tracer
 #define VERIFY(espression) (expression)
 #endif // _DEBUG
 // TODO: reference additional headers your program requires here
+
