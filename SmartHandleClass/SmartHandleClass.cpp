@@ -90,14 +90,40 @@ namespace SmartClass
 		}
 	};
 
+	struct invalid_handle_traits
+	{
+		typedef HANDLE pointer;
+
+		static auto invalid() throw() -> pointer
+		{
+			return INVALID_HANDLE_VALUE;
+		}
+
+		static auto close(pointer value) throw() -> void
+		{
+			VERIFY(CloseHandle(value));
+		}
+	};
+
 	typedef unique_handle<null_handle_traits> null_handle;
+	typedef unique_handle<invalid_handle_traits> invalid_handle;
 }
 
+
 #include <utility>
+#include <memory>
 
 using namespace std;
 using namespace SmartClass;
 
+struct map_view_deleter
+{
+	typedef char const* pointer;
+	auto operator()(pointer value) const throw() -> void
+	{
+		VERIFY(UnmapViewOfFile(value));
+	}
+};
 
 int main()
 {
@@ -148,5 +174,70 @@ int main()
 
 	/*auto copy = null_handle{ event };
 	copy = event;*/
+
+	auto filename = LR"(C:\Users\uqmjung\Documents\Visual Studio 2015\Projects\pluarSightModernCppLibraries\SmartHandleClass\SmartHandleClass.cpp)";
+
+	auto file = invalid_handle
+	{
+		CreateFile(filename,
+			GENERIC_READ,
+			FILE_SHARE_READ,
+			nullptr,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr)
+	};
+
+	if (!file)
+	{
+		printf("CreateFile failed %d\n", GetLastError());
+		
+	}
+	auto size = LARGE_INTEGER{};
+
+	if (!GetFileSizeEx(file.get(), &size))
+	{
+		printf("GetFileSizeEx failed %d\n", GetLastError());
+		return 0;
+	}
+	
+	if (size.QuadPart == 0)
+	{
+		printf("File is empty\n");
+		return 0;
+	}
+
+	auto map = null_handle
+	{
+		CreateFileMapping(file.get(),
+		nullptr,
+			PAGE_READONLY,
+			0,0,
+			nullptr)
+	};
+
+	if (!map)
+	{
+		printf("CreateFileMaping failed %d\n", GetLastError());
+		return 0;
+	}
+
+	file.reset();
+
+	auto view = unique_ptr<char, map_view_deleter>
+	{
+		static_cast<char*> (MapViewOfFile(map.get(),
+											FILE_MAP_READ,
+												0,0,
+												0))
+	};
+
+	if (!view)
+	{
+		printf("MapViewOfFile failed %d\n", GetLastError());
+		return 0;
+	}
+
+	printf("%.*s\n", static_cast<unsigned>(size.QuadPart), view.get());
 }
 
